@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>迷你植物保卫战</title>
+  <style>
+    :root{--ink:#25322c;--cream:#fff7d7;--green:#58a84f;--dark:#32683a;--sun:#ffd34e;--brown:#8b5a34}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;background:linear-gradient(#bce8ff 0 34%,#77b95e 34%);font-family:"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--ink)}
+    .game{width:min(1080px,100%);padding:14px;border:4px solid var(--ink);border-radius:20px;background:var(--cream);box-shadow:10px 10px 0 rgba(37,50,44,.25)}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+    h1{margin:0;font-size:clamp(24px,4vw,38px);color:var(--dark);letter-spacing:.05em}
+    .stats{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;font-weight:900}
+    .badge{padding:8px 12px;border:3px solid var(--ink);border-radius:999px;background:#fff;min-width:100px;text-align:center}
+    .music-button{cursor:pointer;font:inherit;font-weight:900;color:var(--ink)}
+    .music-button.off{background:#e5e5e5;color:#716d68}
+    .toolbar{display:flex;gap:10px;align-items:stretch;margin-bottom:10px;overflow-x:auto;padding:3px 3px 8px}
+    .plant-card{flex:0 0 150px;display:flex;align-items:center;gap:9px;padding:8px;border:3px solid var(--ink);border-radius:12px;background:#fff;cursor:pointer;font:inherit;text-align:left;box-shadow:0 4px 0 var(--ink)}
+    .plant-card.selected{background:#dff5b8;outline:4px solid #f4b942}
+    .plant-card:active{transform:translateY(3px);box-shadow:0 1px 0 var(--ink)}
+    .icon{display:grid;place-items:center;width:42px;height:42px;border-radius:50%;font-size:28px;background:#e8f5d7}
+    .plant-card strong,.plant-card small{display:block}.plant-card small{color:#6b6359;margin-top:3px}
+    .stage{position:relative;overflow:hidden;border:4px solid var(--ink);border-radius:14px;background:#70ad54;touch-action:none}
+    canvas{display:block;width:100%;height:auto;aspect-ratio:3/2}
+    .overlay{position:absolute;inset:0;display:grid;place-items:center;padding:20px;background:rgba(25,40,31,.76);transition:opacity .2s}
+    .overlay.hidden{opacity:0;pointer-events:none}
+    .panel{width:min(440px,100%);padding:25px;border:4px solid var(--ink);border-radius:18px;background:var(--cream);text-align:center;box-shadow:8px 8px 0 rgba(0,0,0,.25)}
+    .panel h2{margin:0 0 10px;color:var(--dark);font-size:31px}.panel p{line-height:1.7}
+    #startButton{padding:11px 24px;border:3px solid var(--ink);border-radius:11px;background:var(--sun);font:inherit;font-size:18px;font-weight:900;cursor:pointer;box-shadow:0 5px 0 var(--ink)}
+    .help{text-align:center;margin-top:10px;font-size:14px;font-weight:700;color:#4f5e53}
+    @media(max-width:650px){body{padding:6px}.game{padding:8px;border-width:3px}header{align-items:flex-start;flex-direction:column}.stats{justify-content:flex-start}.badge{min-width:88px;padding:6px 9px}.plant-card{flex-basis:137px}}
+  </style>
+</head>
+<body>
+  <main class="game">
+    <header>
+      <h1>🌱 迷你植物保卫战</h1>
+      <div class="stats">
+        <div class="badge">☀️ 阳光 <span id="sunCount">150</span></div>
+        <div class="badge">🏆 得分 <span id="score">0</span></div>
+        <div class="badge">🧟 剩余 <span id="remaining">19</span></div>
+        <button class="badge music-button" id="musicButton">🎵 音乐：开</button>
+      </div>
+    </header>
+
+    <div class="toolbar">
+      <button class="plant-card selected" data-plant="shooter">
+        <span class="icon">🌿</span><span><strong>豌豆射手</strong><small>☀️ 100</small></span>
+      </button>
+      <button class="plant-card" data-plant="sunflower">
+        <span class="icon">🌻</span><span><strong>向日葵</strong><small>☀️ 50</small></span>
+      </button>
+      <button class="plant-card" data-plant="wallnut">
+        <span class="icon">🌰</span><span><strong>坚果墙</strong><small>☀️ 75 · 高防御</small></span>
+      </button>
+      <button class="plant-card" data-plant="gatling">
+        <span class="icon">🫛</span><span><strong>机枪射手</strong><small>☀️ 200 · 四连发</small></span>
+      </button>
+      <button class="plant-card" data-plant="chili">
+        <span class="icon">🌶️</span><span><strong>火爆辣椒</strong><small>☀️ 125 · 清除整行</small></span>
+      </button>
+      <button class="plant-card" data-plant="cherry">
+        <span class="icon">🍒</span><span><strong>樱桃炸弹</strong><small>☀️ 150 · 秒杀3×3</small></span>
+      </button>
+      <button class="plant-card" data-plant="doomShroom">
+        <span class="icon">🍄</span><span><strong>毁灭菇</strong><small>☀️ 500 · 全屏秒杀</small></span>
+      </button>
+      <button class="plant-card" data-plant="shovel">
+        <span class="icon">🪏</span><span><strong>小铲子</strong><small>移除植物</small></span>
+      </button>
+    </div>
+
+    <div class="stage">
+      <canvas id="gameCanvas" width="900" height="600" aria-label="植物保卫战游戏草坪"></canvas>
+      <div class="overlay" id="overlay">
+        <section class="panel">
+          <h2 id="messageTitle">守住花园！</h2>
+          <p id="messageText">终极 Boss 有3个阶段，每阶段10000生命。樱桃炸弹可以秒杀3×3范围！</p>
+          <button id="startButton">开始游戏</button>
+        </section>
+      </div>
+    </div>
+    <div class="help">毁灭菇消耗500阳光：全屏秒杀，并对Boss造成10000伤害。</div>
+  </main>
+
+  <script>
+    "use strict";
+    const canvas=document.querySelector("#gameCanvas"),ctx=canvas.getContext("2d");
+    const sunEl=document.querySelector("#sunCount"),scoreEl=document.querySelector("#score"),remainingEl=document.querySelector("#remaining");
+    const overlay=document.querySelector("#overlay"),titleEl=document.querySelector("#messageTitle"),textEl=document.querySelector("#messageText"),startButton=document.querySelector("#startButton");
+    const musicButton=document.querySelector("#musicButton");
+    const cards=[...document.querySelectorAll(".plant-card")];
+
+    // ===== 初学者修改区 =====
+    const ROWS=5,COLS=9,TOTAL_ZOMBIES=15,GIANT_COUNT=3;
+    const STARTING_SUN=150,ZOMBIE_SPEED=11;
+    const SHOOTER_COST=100,SUNFLOWER_COST=50,WALLNUT_COST=75,GATLING_COST=200,CHILI_COST=125,CHERRY_COST=150,DOOM_SHROOM_COST=500;
+    // ========================
+    const field={x:90,y:75,w:810,h:500},cellW=field.w/COLS,cellH=field.h/ROWS;
+    let plants=[],zombies=[],peas=[],suns=[],particles=[];
+    let sun=STARTING_SUN,score=0,spawned=0,defeated=0,bossSpawned=false,giantsDefeated=0,finalBossSpawned=false,finalBossDefeated=false,screenFlash=0,selected="shooter",running=false,lastTime=0,nextSpawn=0,nextSkySun=0,animationId;
+    let audioContext=null,musicTimer=null,musicStep=0,musicOn=true;
+
+    // 使用浏览器合成轻快旋律，不需要额外的音乐文件。
+    const melody=[262,330,392,330,294,349,440,349,262,330,392,523,440,392,330,294];
+    function playNote(frequency){
+      if(!audioContext||!musicOn||!running)return;
+      const oscillator=audioContext.createOscillator(),gain=audioContext.createGain();
+      oscillator.type="triangle";oscillator.frequency.value=frequency;
+      gain.gain.setValueAtTime(.0001,audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(.045,audioContext.currentTime+.02);
+      gain.gain.exponentialRampToValueAtTime(.0001,audioContext.currentTime+.22);
+      oscillator.connect(gain);gain.connect(audioContext.destination);oscillator.start();oscillator.stop(audioContext.currentTime+.24)
+    }
+    function startMusic(){
+      if(!musicOn)return;
+      if(!audioContext)audioContext=new(window.AudioContext||window.webkitAudioContext)();
+      if(audioContext.state==="suspended")audioContext.resume();
+      if(musicTimer)return;
+      playNote(melody[musicStep++%melody.length]);
+      musicTimer=setInterval(()=>playNote(melody[musicStep++%melody.length]),280)
+    }
+    function stopMusic(){if(musicTimer){clearInterval(musicTimer);musicTimer=null}}
+    function toggleMusic(){
+      musicOn=!musicOn;musicButton.textContent=musicOn?"🎵 音乐：开":"🔇 音乐：关";musicButton.classList.toggle("off",!musicOn);
+      if(musicOn&&running)startMusic();else stopMusic()
+    }
+
+    function updateHud(){
+      sunEl.textContent=sun;scoreEl.textContent=score;
+      const futureRegular=Math.max(0,TOTAL_ZOMBIES-spawned),futureGiants=bossSpawned?0:GIANT_COUNT,futureBoss=finalBossSpawned?0:1;
+      const active=zombies.filter(z=>z.type!=="imp").length;remainingEl.textContent=Math.max(0,futureRegular+futureGiants+futureBoss+active)
+    }
+    function resetGame(){plants=[];zombies=[];peas=[];suns=[];particles=[];sun=STARTING_SUN;score=0;spawned=0;defeated=0;bossSpawned=false;giantsDefeated=0;finalBossSpawned=false;finalBossDefeated=false;screenFlash=0;nextSpawn=performance.now()+1800;nextSkySun=performance.now()+1800;updateHud()}
+    function plantAt(row,col){return plants.find(p=>p.row===row&&p.col===col)}
+    function center(row,col){return{x:field.x+col*cellW+cellW/2,y:field.y+row*cellH+cellH/2}}
+
+    function placePlant(row,col){
+      if(selected==="shovel"){plants=plants.filter(p=>p.row!==row||p.col!==col);return}
+      if(plantAt(row,col))return;
+      const costs={shooter:SHOOTER_COST,sunflower:SUNFLOWER_COST,wallnut:WALLNUT_COST,gatling:GATLING_COST,chili:CHILI_COST,cherry:CHERRY_COST,doomShroom:DOOM_SHROOM_COST},cost=costs[selected];
+      if(sun<cost){makeText("阳光不足！",field.x+col*cellW+cellW/2,field.y+row*cellH+30,"#d33");return}
+      sun-=cost;const c=center(row,col);plants.push({type:selected,row,col,x:c.x,y:c.y,hp:selected==="wallnut"?450:100,nextAction:performance.now()+((selected==="chili"||selected==="cherry"||selected==="doomShroom")?650:1000)});updateHud()
+    }
+    function spawnZombie(){
+      if(spawned>=TOTAL_ZOMBIES)return;
+      const row=Math.floor(Math.random()*ROWS),armored=Math.random()<.35;
+      zombies.push({type:armored?"armored":"normal",mainWave:true,row,x:930,y:center(row,8).y,hp:armored?272:112,maxHp:armored?272:112,speed:(ZOMBIE_SPEED+Math.random()*4)*(armored?.72:1),biteAt:0});spawned++;updateHud()
+    }
+    function spawnGiantWave(){
+      if(bossSpawned)return;bossSpawned=true;const now=performance.now(),rows=[0,2,4];
+      rows.slice(0,GIANT_COUNT).forEach((row,index)=>zombies.push({type:"giant",waveGiant:true,row,x:950+index*65,y:center(row,8).y,hp:1120,maxHp:1120,speed:5.2,biteAt:0,throwAt:now+3600+index*900,thrown:false}));
+      makeText("三巨人首领战！",640,112,"#b51f1f");updateHud()
+    }
+    function spawnFinalBoss(){
+      if(finalBossSpawned)return;finalBossSpawned=true;const row=2,now=performance.now();
+      zombies.push({type:"boss",row,x:980,y:center(row,8).y,hp:10000,maxHp:10000,phase:3,speed:3.6,biteAt:0,summonAt:now+3800,summons:0});
+      makeText("终极 Boss 降临！",640,112,"#7d1a8c");updateHud()
+    }
+    function bossSummon(boss){
+      boss.summons++;boss.summonAt=performance.now()+5200;
+      const rows=[0,1,3,4],row=rows[Math.floor(Math.random()*rows.length)],summonGiant=boss.summons%2===0;
+      if(summonGiant)zombies.push({type:"giant",waveGiant:false,row,x:930,y:center(row,8).y,hp:960,maxHp:960,speed:5.5,biteAt:0,throwAt:performance.now()+4800,thrown:false});
+      else{const armored=Math.random()<.55;zombies.push({type:armored?"armored":"normal",mainWave:false,row,x:930,y:center(row,8).y,hp:armored?272:112,maxHp:armored?272:112,speed:(ZOMBIE_SPEED+2)*(armored?.72:1),biteAt:0})}
+      makeText(summonGiant?"Boss召唤巨人！":"Boss召唤僵尸！",boss.x-80,boss.y-95,"#7d1a8c");updateHud()
+    }
+    function summonFiveGiants(boss){
+      const now=performance.now();
+      for(let row=0;row<ROWS;row++)zombies.push({type:"giant",waveGiant:false,row,x:940+row*24,y:center(row,8).y,hp:960,maxHp:960,speed:5.5,biteAt:0,throwAt:now+4200+row*350,thrown:false});
+      makeText(`Boss进入第${boss.phase}阶段：五路巨人！`,500,115,"#7d1a8c");updateHud()
+    }
+    function throwImp(giant){
+      giant.thrown=true;zombies.push({type:"imp",row:giant.row,x:giant.x-45,y:giant.y-105,targetY:giant.y,hp:56,maxHp:56,speed:23,biteAt:0,airborne:true,airTime:.75});
+      makeText("投掷小僵尸！",giant.x-30,giant.y-95,"#7b2e28")
+    }
+    function defeatZombie(z,index){
+      if(z.type==="boss"&&z.phase>1){
+        burst(z.x,z.y,"#b642d2");z.phase--;z.hp=10000;z.maxHp=10000;z.summonAt=performance.now()+4500;summonFiveGiants(z);return
+      }
+      burst(z.x,z.y,z.type==="giant"?"#d14d35":z.type==="boss"?"#b642d2":"#875e48");zombies.splice(index,1);
+      if(z.type==="boss"){finalBossDefeated=true;score+=3000;updateHud();winGame();return}
+      if(z.type==="giant"){score+=1000;if(z.waveGiant){giantsDefeated++;if(giantsDefeated>=GIANT_COUNT)spawnFinalBoss()}updateHud();return}
+      if(z.type==="imp"){score+=50;updateHud();return}
+      score+=100;if(z.mainWave){defeated++;if(defeated>=TOTAL_ZOMBIES)spawnGiantWave()}updateHud()
+    }
+    function spawnSun(x=130+Math.random()*690,y=-20,targetY=120+Math.random()*390){suns.push({x,y,targetY,life:9000,value:25,r:23})}
+    function makeText(text,x,y,color="#fff"){particles.push({text,x,y,vy:-24,life:1,color})}
+    function burst(x,y,color){for(let i=0;i<14;i++){const a=Math.random()*Math.PI*2,s=25+Math.random()*80;particles.push({x,y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.7,color,r:2+Math.random()*4})}}
+
+    function update(dt,now){
+      if(now>nextSpawn&&spawned<TOTAL_ZOMBIES){spawnZombie();nextSpawn=now+2200+Math.random()*1500}
+      if(now>nextSkySun){spawnSun();nextSkySun=now+4500+Math.random()*1700}
+      [...plants].forEach(p=>{
+        if(p.type==="shooter"&&now>p.nextAction&&zombies.some(z=>z.row===p.row&&z.x>p.x)){peas.push({row:p.row,x:p.x+26,y:p.y-5,speed:270});p.nextAction=now+1100}
+        if(p.type==="gatling"&&now>p.nextAction&&zombies.some(z=>z.row===p.row&&z.x>p.x)){for(let n=0;n<4;n++)peas.push({row:p.row,x:p.x+28-n*15,y:p.y-5+(n%2?2:-2),speed:300});p.nextAction=now+1350}
+        if(p.type==="sunflower"&&now>p.nextAction){spawnSun(p.x,p.y-15,p.y+20);p.nextAction=now+6500}
+        if(p.type==="chili"&&now>p.nextAction){
+          for(let x=field.x;x<field.x+field.w;x+=35)burst(x,p.y,"#ff5b25");
+          for(let i=zombies.length-1;i>=0;i--)if(zombies[i].row===p.row){zombies[i].hp-=900;if(zombies[i].hp<=0)defeatZombie(zombies[i],i)}
+          plants.splice(plants.indexOf(p),1);makeText("整行爆破！",450,p.y-30,"#e32b1f")
+        }
+        if(p.type==="cherry"&&now>p.nextAction){
+          for(let row=Math.max(0,p.row-1);row<=Math.min(ROWS-1,p.row+1);row++)for(let col=Math.max(0,p.col-1);col<=Math.min(COLS-1,p.col+1);col++){const c=center(row,col);for(let n=0;n<3;n++)burst(c.x+(Math.random()-.5)*35,c.y+(Math.random()-.5)*35,n%2?"#ffb126":"#ed3d25")}
+          for(let i=zombies.length-1;i>=0;i--)if(Math.abs(zombies[i].row-p.row)<=1&&Math.abs(zombies[i].x-p.x)<=cellW*1.55){zombies[i].hp=0;defeatZombie(zombies[i],i)}
+          plants.splice(plants.indexOf(p),1);makeText("3×3秒杀爆炸！",p.x,p.y-55,"#c91818")
+        }
+        if(p.type==="doomShroom"&&now>p.nextAction){
+          screenFlash=18;for(let y=95;y<575;y+=42)for(let x=120;x<900;x+=95)burst(x,y,(x+y)%2?"#d7f4ff":"#915cff");
+          for(let i=zombies.length-1;i>=0;i--){const z=zombies[i];if(z.type==="boss")z.hp-=10000;else z.hp=0;if(z.hp<=0)defeatZombie(z,i)}
+          plants.splice(plants.indexOf(p),1);makeText("毁灭菇：全屏净化！",450,300,"#6424b8")
+        }
+      });
+      peas.forEach(pea=>pea.x+=pea.speed*dt);
+      for(let i=peas.length-1;i>=0;i--){
+        const pea=peas[i],zi=zombies.findIndex(z=>z.row===pea.row&&Math.abs(z.x-pea.x)<28);
+        if(zi>=0){zombies[zi].hp-=25;burst(pea.x,pea.y,"#77c843");peas.splice(i,1);if(zombies[zi].hp<=0)defeatZombie(zombies[zi],zi);continue}
+        if(pea.x>930)peas.splice(i,1)
+      }
+      for(let i=zombies.length-1;i>=0;i--){
+        const z=zombies[i],target=plants.filter(p=>p.row===z.row&&p.x<z.x+28).sort((a,b)=>b.x-a.x)[0];
+        if(z.airborne){z.x-=150*dt;z.y+=(z.targetY-z.y)*5*dt;z.airTime-=dt;if(z.airTime<=0){z.airborne=false;z.y=z.targetY}continue}
+        if(z.type==="giant"&&!z.thrown&&now>z.throwAt)throwImp(z);
+        if(z.type==="boss"&&now>z.summonAt)bossSummon(z);
+        const reach=z.type==="boss"?82:z.type==="giant"?65:48;
+        if(target&&z.x-target.x<reach){if(now>z.biteAt){target.hp=z.type==="giant"?0:target.hp-(z.type==="boss"?100:25);z.biteAt=now+(z.type==="giant"?1500:z.type==="boss"?1100:750);burst(target.x+15,target.y,z.type==="boss"?"#9a42bd":z.type==="giant"?"#db693f":"#f4d35e");if(target.hp<=0){plants.splice(plants.indexOf(target),1);if(z.type==="giant")makeText("一击摧毁！",target.x,target.y-35,"#b51f1f")}}}else z.x-=z.speed*dt;
+        if(z.x<field.x-8){endGame();return}
+      }
+      suns.forEach(s=>{if(s.y<s.targetY)s.y=Math.min(s.targetY,s.y+85*dt);s.life-=dt*1000});suns=suns.filter(s=>s.life>0);
+      particles.forEach(p=>{p.x+=(p.vx||0)*dt;p.y+=(p.vy||0)*dt;p.life-=dt});particles=particles.filter(p=>p.life>0)
+      screenFlash=Math.max(0,screenFlash-1)
+    }
+
+    function drawBackground(){
+      const sky=ctx.createLinearGradient(0,0,0,130);sky.addColorStop(0,"#70c8f1");sky.addColorStop(1,"#d9f3ff");ctx.fillStyle=sky;ctx.fillRect(0,0,canvas.width,130);
+      ctx.fillStyle="rgba(255,255,255,.86)";[[165,36,62],[450,24,48],[720,47,70]].forEach(([x,y,s])=>{ctx.beginPath();ctx.arc(x-s*.45,y,s*.28,0,Math.PI*2);ctx.arc(x,y-s*.12,s*.42,0,Math.PI*2);ctx.arc(x+s*.48,y,s*.3,0,Math.PI*2);ctx.fill()});
+      ctx.fillStyle="#3f7c42";for(let x=20;x<900;x+=78){ctx.beginPath();ctx.arc(x,78,45,Math.PI,0);ctx.fill()}
+      const lawn=ctx.createLinearGradient(0,75,0,575);lawn.addColorStop(0,"#6db64e");lawn.addColorStop(1,"#3f873d");ctx.fillStyle=lawn;ctx.fillRect(0,75,canvas.width,500);
+      ctx.fillStyle="#d8c18b";ctx.fillRect(0,575,canvas.width,25);for(let x=0;x<900;x+=35){ctx.fillStyle=x%70?"#c8ae73":"#e5d09c";ctx.fillRect(x,575,28,4)}
+      ctx.shadowColor="rgba(35,30,20,.32)";ctx.shadowBlur=12;ctx.shadowOffsetY=7;ctx.fillStyle="#efdba8";ctx.fillRect(6,145,75,335);ctx.shadowColor="transparent";ctx.strokeStyle="#6f4a31";ctx.lineWidth=5;ctx.strokeRect(6,145,75,335);
+      const roof=ctx.createLinearGradient(0,100,0,155);roof.addColorStop(0,"#c65c45");roof.addColorStop(1,"#7d3029");ctx.fillStyle=roof;ctx.beginPath();ctx.moveTo(-8,150);ctx.lineTo(42,98);ctx.lineTo(92,150);ctx.closePath();ctx.fill();ctx.stroke();
+      ctx.fillStyle="#835332";ctx.fillRect(28,357,33,123);ctx.fillStyle="#3c2418";ctx.beginPath();ctx.arc(52,418,3,0,Math.PI*2);ctx.fill();
+      for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+        const x=field.x+c*cellW,y=field.y+r*cellH,g=ctx.createLinearGradient(x,y,x,y+cellH);g.addColorStop(0,(r+c)%2?"#78bd54":"#86ca5d");g.addColorStop(1,(r+c)%2?"#62a947":"#70b64e");ctx.fillStyle=g;ctx.fillRect(x,y,cellW,cellH);
+        ctx.strokeStyle="rgba(238,255,220,.23)";ctx.lineWidth=1;ctx.strokeRect(x+.5,y+.5,cellW-1,cellH-1);
+        ctx.strokeStyle="rgba(35,94,44,.18)";for(let k=0;k<5;k++){const gx=x+12+k*16,gy=y+17+((r+c+k)*13)%65;ctx.beginPath();ctx.moveTo(gx,gy+7);ctx.quadraticCurveTo(gx-3,gy+2,gx-1,gy);ctx.moveTo(gx,gy+7);ctx.quadraticCurveTo(gx+4,gy+2,gx+3,gy-1);ctx.stroke()}
+      }
+      const shade=ctx.createLinearGradient(field.x,0,field.x+field.w,0);shade.addColorStop(0,"rgba(0,0,0,.10)");shade.addColorStop(.2,"rgba(255,255,255,.06)");shade.addColorStop(1,"rgba(0,0,0,.08)");ctx.fillStyle=shade;ctx.fillRect(field.x,field.y,field.w,field.h)
+    }
+    function drawPlant(p){
+      ctx.save();ctx.translate(p.x,p.y);ctx.shadowColor="rgba(15,55,20,.35)";ctx.shadowBlur=9;ctx.shadowOffsetY=7;ctx.fillStyle="rgba(30,70,30,.34)";ctx.beginPath();ctx.ellipse(0,34,29,9,0,0,Math.PI*2);ctx.fill();ctx.shadowColor="transparent";
+      if(p.type==="wallnut"){
+        const nut=ctx.createRadialGradient(-10,-21,4,0,-7,38);nut.addColorStop(0,"#e9b66f");nut.addColorStop(.55,"#b9793f");nut.addColorStop(1,"#704122");ctx.fillStyle=nut;ctx.strokeStyle="#5b351f";ctx.lineWidth=3;ctx.beginPath();ctx.roundRect(-29,-45,58,79,25);ctx.fill();ctx.stroke();
+        ctx.fillStyle="rgba(255,255,255,.22)";ctx.beginPath();ctx.ellipse(-11,-27,8,15,-.4,0,Math.PI*2);ctx.fill();ctx.fillStyle="#2a2019";ctx.beginPath();ctx.arc(-10,-12,3.5,0,Math.PI*2);ctx.arc(10,-12,3.5,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#432b1d";ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(0,3,10,Math.PI+.3,Math.PI*2-.3);ctx.stroke();
+        if(p.hp<300){ctx.strokeStyle="#6b3c22";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-4,-40);ctx.lineTo(3,-28);ctx.lineTo(-3,-17);ctx.moveTo(19,1);ctx.lineTo(9,9);ctx.lineTo(16,20);ctx.stroke()}
+        if(p.hp<150){ctx.beginPath();ctx.moveTo(-23,9);ctx.lineTo(-11,16);ctx.lineTo(-17,29);ctx.stroke()}
+        ctx.restore();return
+      }
+      if(p.type==="chili"){
+        ctx.shadowColor="#ff6b20";ctx.shadowBlur=18;const pepper=ctx.createLinearGradient(-25,-35,22,30);pepper.addColorStop(0,"#ff8350");pepper.addColorStop(.45,"#e63121");pepper.addColorStop(1,"#8e1010");ctx.fillStyle=pepper;ctx.strokeStyle="#721515";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-13,-35);ctx.bezierCurveTo(19,-39,30,-9,12,17);ctx.quadraticCurveTo(0,35,-25,29);ctx.quadraticCurveTo(-4,20,-10,5);ctx.bezierCurveTo(-22,-9,-25,-27,-13,-35);ctx.fill();ctx.stroke();ctx.shadowColor="transparent";ctx.strokeStyle="#276b35";ctx.lineWidth=6;ctx.beginPath();ctx.moveTo(-5,-34);ctx.quadraticCurveTo(-1,-51,14,-48);ctx.stroke();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(-7,-15,5,0,Math.PI*2);ctx.arc(8,-14,5,0,Math.PI*2);ctx.fill();ctx.fillStyle="#311";ctx.beginPath();ctx.arc(-5,-14,2,0,Math.PI*2);ctx.arc(10,-13,2,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#4d1010";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-8,2);ctx.lineTo(10,0);ctx.stroke();ctx.restore();return
+      }
+      if(p.type==="cherry"){
+        ctx.shadowColor="#ff3a28";ctx.shadowBlur=18;const cherry=ctx.createRadialGradient(-9,-18,3,-5,-10,24);cherry.addColorStop(0,"#ff8b74");cherry.addColorStop(.45,"#e62f2f");cherry.addColorStop(1,"#851515");ctx.fillStyle=cherry;ctx.strokeStyle="#701313";ctx.lineWidth=3;ctx.beginPath();ctx.arc(-15,-3,22,0,Math.PI*2);ctx.arc(18,3,22,0,Math.PI*2);ctx.fill();ctx.stroke();ctx.shadowColor="transparent";ctx.strokeStyle="#2f7537";ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(-15,-24);ctx.quadraticCurveTo(-5,-48,7,-51);ctx.moveTo(18,-19);ctx.quadraticCurveTo(15,-40,7,-51);ctx.stroke();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(-21,-8,5,0,Math.PI*2);ctx.arc(-8,-8,5,0,Math.PI*2);ctx.arc(11,-1,5,0,Math.PI*2);ctx.arc(24,-1,5,0,Math.PI*2);ctx.fill();ctx.fillStyle="#311";ctx.beginPath();ctx.arc(-19,-7,2,0,Math.PI*2);ctx.arc(-6,-7,2,0,Math.PI*2);ctx.arc(13,0,2,0,Math.PI*2);ctx.arc(26,0,2,0,Math.PI*2);ctx.fill();ctx.restore();return
+      }
+      if(p.type==="doomShroom"){
+        ctx.shadowColor="#a84dff";ctx.shadowBlur=24;const cap=ctx.createRadialGradient(-10,-34,4,0,-19,39);cap.addColorStop(0,"#d990ff");cap.addColorStop(.45,"#7331a4");cap.addColorStop(1,"#241030");ctx.fillStyle=cap;ctx.strokeStyle="#291035";ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,-17,35,28,0,Math.PI,Math.PI*2);ctx.lineTo(31,-9);ctx.quadraticCurveTo(0,4,-31,-9);ctx.closePath();ctx.fill();ctx.stroke();ctx.shadowColor="transparent";const stalk=ctx.createLinearGradient(-13,-7,15,34);stalk.addColorStop(0,"#d9c9e2");stalk.addColorStop(1,"#6e5979");ctx.fillStyle=stalk;ctx.beginPath();ctx.roundRect(-14,-8,28,43,12);ctx.fill();ctx.stroke();ctx.fillStyle="#1a1020";ctx.beginPath();ctx.arc(-6,8,3,0,Math.PI*2);ctx.arc(6,8,3,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#26132d";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-7,19);ctx.lineTo(8,19);ctx.stroke();ctx.fillStyle="#f06cff";for(const [x,y] of [[-18,-27],[0,-39],[18,-25]]){ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill()}ctx.restore();return
+      }
+      const stem=ctx.createLinearGradient(-5,0,7,0);stem.addColorStop(0,"#276b35");stem.addColorStop(.5,"#75c55a");stem.addColorStop(1,"#245e30");ctx.strokeStyle=stem;ctx.lineWidth=9;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(0,29);ctx.quadraticCurveTo(-3,11,0,-7);ctx.stroke();
+      const leaf=ctx.createLinearGradient(-20,0,20,20);leaf.addColorStop(0,"#8ad05d");leaf.addColorStop(1,"#2d7438");ctx.fillStyle=leaf;ctx.strokeStyle="#286334";ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(-17,16,19,9,-.45,0,Math.PI*2);ctx.ellipse(17,12,19,9,.45,0,Math.PI*2);ctx.fill();ctx.stroke();
+      if(p.type==="sunflower"){
+        for(let a=0;a<Math.PI*2;a+=Math.PI/12){const petal=ctx.createRadialGradient(Math.cos(a)*15,Math.sin(a)*15-15,2,Math.cos(a)*21,Math.sin(a)*21-15,13);petal.addColorStop(0,"#fff18a");petal.addColorStop(1,"#e8a92e");ctx.fillStyle=petal;ctx.beginPath();ctx.ellipse(Math.cos(a)*22,Math.sin(a)*22-15,13,6,a,0,Math.PI*2);ctx.fill()}
+        const face=ctx.createRadialGradient(-5,-21,2,0,-15,18);face.addColorStop(0,"#b67a31");face.addColorStop(1,"#67411f");ctx.fillStyle=face;ctx.beginPath();ctx.arc(0,-15,17,0,Math.PI*2);ctx.fill();ctx.fillStyle="#17130e";ctx.beginPath();ctx.arc(-6,-19,2.5,0,Math.PI*2);ctx.arc(6,-19,2.5,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#2d1d13";ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,-12,7,0.15,Math.PI-.15);ctx.stroke()
+      }else{
+        const head=ctx.createRadialGradient(-7,-25,3,2,-16,25);head.addColorStop(0,"#a8e97a");head.addColorStop(.55,"#66bd4e");head.addColorStop(1,"#2d7638");ctx.fillStyle=head;ctx.strokeStyle="#286533";ctx.lineWidth=2.5;ctx.beginPath();ctx.arc(0,-17,22,0,Math.PI*2);ctx.fill();ctx.stroke();
+        const snout=ctx.createLinearGradient(10,-28,39,-14);snout.addColorStop(0,"#78cf5a");snout.addColorStop(1,"#3f8c40");ctx.fillStyle=snout;ctx.beginPath();ctx.roundRect(13,-29,28,18,8);ctx.fill();ctx.stroke();ctx.fillStyle="#174f2c";ctx.beginPath();ctx.ellipse(36,-20,5,7,0,0,Math.PI*2);ctx.fill();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(-6,-23,5,0,Math.PI*2);ctx.fill();ctx.fillStyle="#15281c";ctx.beginPath();ctx.arc(-5,-23,2.3,0,Math.PI*2);ctx.fill();ctx.fillStyle="rgba(255,255,255,.35)";ctx.beginPath();ctx.arc(5,-27,5,0,Math.PI*2);ctx.fill();
+        if(p.type==="gatling"){ctx.fillStyle="#477f32";ctx.strokeStyle="#245b2d";ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(12,-43,31,12,6);ctx.roundRect(12,-9,31,12,6);ctx.fill();ctx.stroke();ctx.fillStyle="#153f24";ctx.beginPath();ctx.ellipse(38,-37,5,5,0,0,Math.PI*2);ctx.ellipse(38,-3,5,5,0,0,Math.PI*2);ctx.fill();ctx.fillStyle="#546b2f";ctx.fillRect(-16,-45,24,7)}
+      }
+      ctx.restore()
+    }
+    function drawZombie(z){
+      ctx.save();ctx.translate(z.x,z.y);if(z.type==="giant")ctx.scale(1.48,1.48);if(z.type==="boss")ctx.scale(1.78,1.78);if(z.type==="imp")ctx.scale(.67,.67);
+      if(z.type==="boss"){ctx.shadowColor="#b249dc";ctx.shadowBlur=22;ctx.strokeStyle="rgba(151,60,190,.55)";ctx.lineWidth=5;ctx.beginPath();ctx.arc(0,-11,42,0,Math.PI*2);ctx.stroke();ctx.shadowColor="transparent"}
+      ctx.shadowColor="rgba(15,25,20,.35)";ctx.shadowBlur=8;ctx.shadowOffsetY=5;ctx.fillStyle="rgba(20,35,20,.32)";ctx.beginPath();ctx.ellipse(-1,43,27,8,0,0,Math.PI*2);ctx.fill();ctx.shadowColor="transparent";
+      if(z.type==="giant"){
+        const pole=ctx.createLinearGradient(-42,-25,40,18);pole.addColorStop(0,"#554c43");pole.addColorStop(.5,"#aca59b");pole.addColorStop(1,"#48413b");ctx.strokeStyle=pole;ctx.lineWidth=10;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(-42,-30);ctx.lineTo(42,18);ctx.stroke();ctx.strokeStyle="#2d2926";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-42,-30);ctx.lineTo(42,18);ctx.stroke();
+      }
+      ctx.strokeStyle="#26332e";ctx.lineWidth=7;ctx.lineCap="round";ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(-4,23);ctx.moveTo(-1,2);ctx.lineTo(-27,12);ctx.moveTo(-4,23);ctx.lineTo(-20,43);ctx.moveTo(-4,23);ctx.lineTo(15,42);ctx.stroke();
+      const coat=ctx.createLinearGradient(-18,-10,18,25);coat.addColorStop(0,"#8b674e");coat.addColorStop(.5,"#654735");coat.addColorStop(1,"#3d2b25");ctx.fillStyle=coat;ctx.strokeStyle="#352a24";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-18,-10);ctx.lineTo(17,-8);ctx.lineTo(13,28);ctx.lineTo(-7,23);ctx.lineTo(-19,8);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle="#9d3e38";ctx.beginPath();ctx.moveTo(-2,-8);ctx.lineTo(5,1);ctx.lineTo(-1,15);ctx.lineTo(-8,0);ctx.closePath();ctx.fill();
+      const skin=ctx.createRadialGradient(-7,-37,4,1,-28,24);skin.addColorStop(0,"#b9d4aa");skin.addColorStop(.6,"#829d7d");skin.addColorStop(1,"#526b59");ctx.fillStyle=skin;ctx.strokeStyle="#30473a";ctx.lineWidth=3;ctx.beginPath();ctx.ellipse(0,-30,20,23,-.1,0,Math.PI*2);ctx.fill();ctx.stroke();
+      ctx.fillStyle="#eef6d8";ctx.beginPath();ctx.arc(-7,-35,6,0,Math.PI*2);ctx.arc(7,-34,6,0,Math.PI*2);ctx.fill();ctx.fillStyle="#242a23";ctx.beginPath();ctx.arc(-5,-34,2.5,0,Math.PI*2);ctx.arc(9,-33,2.5,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#3f3029";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-8,-19);ctx.lineTo(10,-20);ctx.stroke();ctx.fillStyle="#e8dec8";ctx.fillRect(-3,-21,5,5);ctx.fillRect(5,-21,5,4);
+      if(z.type==="armored"){
+        const metal=ctx.createLinearGradient(-25,-66,24,-43);metal.addColorStop(0,"#66717b");metal.addColorStop(.45,"#d5dde1");metal.addColorStop(1,"#59636c");ctx.fillStyle=metal;ctx.strokeStyle="#374149";ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(-23,-66);ctx.lineTo(23,-66);ctx.lineTo(20,-39);ctx.quadraticCurveTo(0,-33,-20,-40);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle="rgba(255,255,255,.45)";ctx.fillRect(-15,-61,24,4);ctx.strokeStyle="#2e3940";ctx.beginPath();ctx.moveTo(-25,-67);ctx.lineTo(25,-67);ctx.stroke();
+        ctx.fillStyle="rgba(25,30,32,.55)";ctx.fillRect(-24,-78,48,6);ctx.fillStyle="#e14d45";ctx.fillRect(-24,-78,48*(z.hp/z.maxHp),6)
+      }else{ctx.strokeStyle="#415044";ctx.beginPath();ctx.moveTo(-14,-46);ctx.lineTo(-8,-56);ctx.moveTo(-6,-49);ctx.lineTo(-2,-60);ctx.moveTo(5,-49);ctx.lineTo(12,-58);ctx.stroke()}
+      if(z.type==="giant"){
+        ctx.fillStyle="rgba(35,25,20,.68)";ctx.fillRect(-31,-79,62,7);ctx.fillStyle="#d9483d";ctx.fillRect(-31,-79,62*(z.hp/z.maxHp),7);ctx.strokeStyle="#2b211c";ctx.lineWidth=1.5;ctx.strokeRect(-31,-79,62,7);ctx.fillStyle="#fff";ctx.font="bold 9px sans-serif";ctx.textAlign="center";ctx.fillText("巨人",0,-84)
+      }
+      if(z.type==="boss"){
+        ctx.fillStyle="#5c1f78";ctx.strokeStyle="#2d1139";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(-19,-50);ctx.lineTo(-15,-70);ctx.lineTo(-5,-57);ctx.lineTo(2,-75);ctx.lineTo(9,-56);ctx.lineTo(20,-69);ctx.lineTo(18,-48);ctx.closePath();ctx.fill();ctx.stroke();ctx.fillStyle="#dc62ff";ctx.beginPath();ctx.arc(2,-64,4,0,Math.PI*2);ctx.fill();ctx.fillStyle="rgba(28,12,35,.75)";ctx.fillRect(-38,-88,76,8);ctx.fillStyle="#b642d2";ctx.fillRect(-38,-88,76*(z.hp/z.maxHp),8);ctx.strokeStyle="#221027";ctx.strokeRect(-38,-88,76,8);ctx.fillStyle="#fff";ctx.font="bold 9px sans-serif";ctx.textAlign="center";ctx.fillText(`终极 BOSS · 第${z.phase}阶段`,0,-93)
+      }
+      ctx.restore()
+    }
+    function draw(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);drawBackground();plants.forEach(drawPlant);peas.forEach(p=>{ctx.save();ctx.shadowColor="#9cff68";ctx.shadowBlur=12;const peaGlow=ctx.createRadialGradient(p.x-3,p.y-3,1,p.x,p.y,9);peaGlow.addColorStop(0,"#d8ff9b");peaGlow.addColorStop(.45,"#79d34f");peaGlow.addColorStop(1,"#347b38");ctx.fillStyle=peaGlow;ctx.beginPath();ctx.arc(p.x,p.y,9,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#285f31";ctx.lineWidth=2;ctx.stroke();ctx.restore()});zombies.forEach(drawZombie);
+      suns.forEach(s=>{ctx.fillStyle="rgba(255,211,78,.35)";ctx.beginPath();ctx.arc(s.x,s.y,s.r+8,0,Math.PI*2);ctx.fill();ctx.fillStyle="#ffd34e";ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill();ctx.strokeStyle="#e5a82f";ctx.lineWidth=3;ctx.stroke();ctx.fillStyle="#8b6120";ctx.font="bold 16px sans-serif";ctx.textAlign="center";ctx.fillText("+25",s.x,s.y+5)});
+      particles.forEach(p=>{ctx.globalAlpha=Math.max(0,p.life);ctx.fillStyle=p.color;if(p.text){ctx.font="bold 20px sans-serif";ctx.textAlign="center";ctx.fillText(p.text,p.x,p.y)}else{ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill()}});ctx.globalAlpha=1;
+      if(screenFlash>0){const flash=ctx.createRadialGradient(450,300,20,450,300,520);flash.addColorStop(0,`rgba(255,255,255,${screenFlash/20})`);flash.addColorStop(.35,`rgba(176,92,255,${screenFlash/28})`);flash.addColorStop(1,"rgba(41,10,65,0)");ctx.fillStyle=flash;ctx.fillRect(0,0,900,600)}
+    }
+    function pointerPos(e){const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}
+    function handleTap(e){if(!running)return;e.preventDefault();const p=pointerPos(e),sunIndex=suns.findIndex(s=>Math.hypot(s.x-p.x,s.y-p.y)<s.r+12);if(sunIndex>=0){sun+=suns[sunIndex].value;makeText("+25",suns[sunIndex].x,suns[sunIndex].y,"#8b6120");suns.splice(sunIndex,1);updateHud();return}if(p.x>=field.x&&p.x<field.x+field.w&&p.y>=field.y&&p.y<field.y+field.h){placePlant(Math.floor((p.y-field.y)/cellH),Math.floor((p.x-field.x)/cellW))}}
+    function loop(now){if(!running)return;const dt=Math.min(.04,(now-lastTime)/1000);lastTime=now;update(dt,now);draw();animationId=requestAnimationFrame(loop)}
+    function startGame(){cancelAnimationFrame(animationId);resetGame();running=true;overlay.classList.add("hidden");lastTime=performance.now();startMusic();animationId=requestAnimationFrame(loop)}
+    function endGame(){if(!running)return;running=false;stopMusic();cancelAnimationFrame(animationId);titleEl.textContent="花园失守了";textEl.textContent=`你消灭了 ${defeated} 只僵尸，得分 ${score}。调整植物位置，再试一次吧！`;startButton.textContent="重新开始";overlay.classList.remove("hidden")}
+    function winGame(){if(!running)return;running=false;stopMusic();cancelAnimationFrame(animationId);draw();titleEl.textContent="保卫成功！";textEl.textContent=`你成功守住了花园，最终得分 ${score}！`;startButton.textContent="再玩一次";overlay.classList.remove("hidden")}
+    cards.forEach(card=>card.addEventListener("click",()=>{selected=card.dataset.plant;cards.forEach(c=>c.classList.toggle("selected",c===card))}));canvas.addEventListener("pointerdown",handleTap);startButton.addEventListener("click",startGame);musicButton.addEventListener("click",toggleMusic);resetGame();draw();
+  </script>
+</body>
+</html>
